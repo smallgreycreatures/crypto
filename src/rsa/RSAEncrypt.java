@@ -1,5 +1,6 @@
 package rsa;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
@@ -10,14 +11,16 @@ import java.util.Random;
 public class RSAEncrypt {
 
 	final int bits = 1024;
-	
+	String msg = "4";
+	String outputFileName = "file.txt";
 	// has to be 0 < k < m
 	final BigInteger K = new BigInteger("65537");
 	
 	public void init() {
-		BigInteger p, q, n, m = null, d;
+		long startTime = System.currentTimeMillis();
+		BigInteger p = null, q = null, n = null, m = null, a;
 		boolean findingPrimes = true;
-		String filePath = "file.txt";
+		String filePath = "dummytext.txt";
 
 		//p and q = primes
 		//n = pq
@@ -37,22 +40,34 @@ public class RSAEncrypt {
 				findingPrimes = false;
 		}
 		//just testing Works!
-		//BigInteger a = new BigInteger("21");
-		//BigInteger b = new BigInteger("79");
+		BigInteger b = new BigInteger("3");
+		BigInteger c = new BigInteger("55");
+		BigInteger d = new BigInteger("27");
 		//BigInteger c = inverse(a, b);
-		
+		System.out.println("Special phi" + specialPhi(new BigInteger("5"), new BigInteger("11")).toString());
+		System.out.println("inverse" + inverse(b, new BigInteger("40")));
 		//System.out.println(c.toString());
-		d = inverse(K, m);
-		
-		/*try {
+		a = inverse(K, m);
+//		BigInteger message = new BigInteger(msg.getBytes());
+//		BigInteger encrypted = encrypt(K, n, message);
+//		System.out.println(encrypted.toString());
+		try {
 			byte[] file = readFile(filePath);
 			
 			BigInteger message = new BigInteger(file);
+			System.out.println(message.toString());
+			BigInteger encrypted = encrypt(K, n, message);
+			System.out.println(encrypted.toString());
 			
+			BigInteger decrypted = decrypt(a, n, encrypted);
+			System.out.println(decrypted.toString());
+			
+			byte[] decryptedFile = decrypted.toByteArray();
+			writeToFile(decryptedFile);
 		} catch (IOException e) {
 			e.printStackTrace();
-		}*/
-		
+		}
+		System.out.println("Runtime: " + (System.currentTimeMillis()-startTime) + "ms");
 	}
 	
 	private BigInteger generateProbablePrime(int size) {	
@@ -136,6 +151,41 @@ public class RSAEncrypt {
 		BigInteger z = answer[1].subtract(temp);
 		
 		return new BigInteger[] {x, y, z}; 
+	}
+	//Encrypting message^k mod n
+	public BigInteger encrypt(BigInteger k, BigInteger n, BigInteger message) {
+		 return message.modPow(k, n);
+	}
+	
+	//Decrypting message^a mod n with an additive chaining algorithm used in Math.BigInteger 
+	public BigInteger decrypt(BigInteger a, BigInteger n, BigInteger encrypted) {
+		BigInteger decrypted = BigInteger.ONE;
+		
+		while (a.compareTo(BigInteger.ZERO) == 1) {
+			if (a.and(BigInteger.ONE).compareTo(BigInteger.ONE) == 0) {
+				decrypted = calculateProduct(decrypted, encrypted).mod(n);
+				
+			}
+			a = a.shiftRight(1);
+			encrypted = calculateProduct(encrypted, encrypted).mod(n);
+			
+		}
+		return decrypted;
+	}
+	
+	public void writeToFile(byte[] fileArr) {
+		
+		try {
+			FileOutputStream fos = new FileOutputStream(outputFileName);
+			fos.write(fileArr);
+			fos.close();
+		}
+		catch(IOException e) {
+			
+			System.out.println("fuggin ioexceptions");
+		}
+		
+		System.out.println("Success in creating file named " + outputFileName);
 	}
 	
 	public static void main(String[]args) {
