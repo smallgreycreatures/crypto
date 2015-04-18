@@ -10,21 +10,41 @@ import java.util.Random;
 
 public class RSAEncrypt {
 
+	//Size of random primes
 	final int bits = 1024;
-	String msg = "4";
-	String outputFileName = "file.txt";
-	// has to be 0 < k < m
+	
+	// has to be 0 < K < m
 	final BigInteger K = new BigInteger("65537");
 	
-	public void init() {
+	public void testing(String filePath) {
 		long startTime = System.currentTimeMillis();
+		
+		BigInteger[] keys = generateKeyPair();
+		BigInteger privateExponent	= keys[0];
+		BigInteger modValue			= keys[1];
+		BigInteger publicExponent	= keys[2];
+		try {
+			encryptFile(filePath, "encryptedFile.txt", publicExponent, modValue);
+			
+			decryptFile("encryptedFile.txt", "decryptedFile.txt", privateExponent, modValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("Runtime: " + (System.currentTimeMillis()-startTime) + "ms");
+	}
+	
+	
+	/**
+	 * 
+	 * @return [privateExponent, modvalue, publicExponent]
+	 */
+	public BigInteger[] generateKeyPair() {
+		BigInteger[] generatedKeys = new BigInteger[3];
 		BigInteger p = null, q = null, n = null, m = null, a;
+		
 		boolean findingPrimes = true;
-		String filePath = "dummytext.txt";
-
-		//p and q = primes
-		//n = pq
-		//m = (p-1)(q-1)
+		
 		while(findingPrimes) {
 			//find two big primes p and q
 			p		= generateProbablePrime(bits);
@@ -33,41 +53,17 @@ public class RSAEncrypt {
 			n		= calculateProduct(p,q);
 			//m = (p-1)(q-1)
 			m		= specialPhi(p,q);
-			System.out.println("p = " + p.toString()
-							+ "\nq = " +q.toString());
+			//System.out.println("p = " + p.toString() + "\nq = " +q.toString());
 			//check if gcd(k,m) = 1
 			if (gcd(K, m).equals(BigInteger.ONE))
 				findingPrimes = false;
 		}
-		//just testing Works!
-		BigInteger b = new BigInteger("3");
-		BigInteger c = new BigInteger("55");
-		BigInteger d = new BigInteger("27");
-		//BigInteger c = inverse(a, b);
-		System.out.println("Special phi" + specialPhi(new BigInteger("5"), new BigInteger("11")).toString());
-		System.out.println("inverse" + inverse(b, new BigInteger("40")));
-		//System.out.println(c.toString());
+		//a*K congruent 1 mod m (finding inverse with extended euclides)
 		a = inverse(K, m);
-//		BigInteger message = new BigInteger(msg.getBytes());
-//		BigInteger encrypted = encrypt(K, n, message);
-//		System.out.println(encrypted.toString());
-		try {
-			byte[] file = readFile(filePath);
-			
-			BigInteger message = new BigInteger(file);
-			System.out.println(message.toString());
-			BigInteger encrypted = encrypt(K, n, message);
-			System.out.println(encrypted.toString());
-			
-			BigInteger decrypted = decrypt(a, n, encrypted);
-			System.out.println(decrypted.toString());
-			
-			byte[] decryptedFile = decrypted.toByteArray();
-			writeToFile(decryptedFile);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		System.out.println("Runtime: " + (System.currentTimeMillis()-startTime) + "ms");
+		generatedKeys[0] = a;
+		generatedKeys[1] = n;
+		generatedKeys[2] = K;
+		return generatedKeys;
 	}
 	
 	private BigInteger generateProbablePrime(int size) {	
@@ -86,7 +82,7 @@ public class RSAEncrypt {
 		return n;
 	}
 	
-	//gcd method that cares about javas stack size and therefor does not use recursion
+	//gcd method that cares about java's stack size and therefore does not use recursion
 	private BigInteger gcd(BigInteger k, BigInteger m) {
 		BigInteger tmp;
 		if (m.compareTo(k) > 0) {
@@ -126,10 +122,11 @@ public class RSAEncrypt {
 	private BigInteger inverse(BigInteger k, BigInteger m) {
 		BigInteger[] ba = extendedEuclidean(k, m);
 		
-		for (int i = 0; i < ba.length; i++) {
+		/* Test printing if inverse is ok.
+		 * for (int i = 0; i < ba.length; i++) {
 			
 			System.out.println(ba[i].toString());
-		}
+		}*/
 		if (ba[1].compareTo(BigInteger.ZERO) == 1) {
 			return ba[1];
 		} else {
@@ -152,13 +149,27 @@ public class RSAEncrypt {
 		
 		return new BigInteger[] {x, y, z}; 
 	}
-	//Encrypting message^k mod n
-	public BigInteger encrypt(BigInteger k, BigInteger n, BigInteger message) {
+	
+	/**
+	 * Encrypting message^k mod n
+	 * @param publicKey
+	 * @param modVal
+	 * @param message
+	 * @return
+	 */
+	private BigInteger encrypt(BigInteger k, BigInteger n, BigInteger message) {
 		 return message.modPow(k, n);
 	}
-	
-	//Decrypting message^a mod n with an additive chaining algorithm used in Math.BigInteger 
-	public BigInteger decrypt(BigInteger a, BigInteger n, BigInteger encrypted) {
+
+	/**
+	 * Decrypting message^a mod n with an additive chaining algorithm used in Math.BigInteger 
+	 * and explained on p. 244 of "Applied Cryptography, Second Edition" by Bruce Schneier
+	 * @param privateKey
+	 * @param modVal
+	 * @param encrypted
+	 * @return
+	 */
+	private BigInteger decrypt(BigInteger a, BigInteger n, BigInteger encrypted) {
 		BigInteger decrypted = BigInteger.ONE;
 		
 		while (a.compareTo(BigInteger.ZERO) == 1) {
@@ -173,24 +184,71 @@ public class RSAEncrypt {
 		return decrypted;
 	}
 	
-	public void writeToFile(byte[] fileArr) {
+	private void writeToFile(byte[] fileArr, String fileName) {
 		
 		try {
-			FileOutputStream fos = new FileOutputStream(outputFileName);
+			FileOutputStream fos = new FileOutputStream(fileName);
 			fos.write(fileArr);
 			fos.close();
 		}
 		catch(IOException e) {
 			
-			System.out.println("fuggin ioexceptions");
+			e.printStackTrace();
 		}
 		
-		System.out.println("Success in creating file named " + outputFileName);
+		System.out.println("Success in creating file named " + fileName);
+	}
+	
+	/**
+	 * 
+	 * @param filename
+	 * @param encryptedFileName
+	 * @param publicKey
+	 * @param modVal
+	 * @throws IOException
+	 */
+	public void encryptFile(String filename, String encryptedFileName, BigInteger exponent, BigInteger n) throws IOException {
+		byte[] file = readFile(filename);
+		
+		BigInteger fileAsInt = new BigInteger(file);
+		
+		BigInteger encryptedFile = encrypt(exponent, n, fileAsInt);
+		
+		writeToFile(encryptedFile.toByteArray(), encryptedFileName);
+	}
+	
+	/**
+	 * 
+	 * @param fileName
+	 * @param decryptedFileName
+	 * @param privateKey
+	 * @param modVal
+	 * @throws IOException
+	 */
+	public void decryptFile(String fileName, String decryptedFileName, BigInteger exponent, BigInteger n) throws IOException {
+		byte[] file = readFile(fileName);
+		
+		BigInteger fileAsInt = new BigInteger(file);
+		
+		BigInteger decryptedFile = decrypt(exponent, n, fileAsInt);
+		
+		writeToFile(decryptedFile.toByteArray(), decryptedFileName);
+	}
+	
+	public BigInteger encryptString(String text, BigInteger exponent, BigInteger n) {
+		BigInteger stringAsInt = new BigInteger(text.getBytes());
+		
+		return encrypt(exponent, n, stringAsInt);
+	}
+	public BigInteger decryptString(String text, BigInteger exponent, BigInteger n) {
+		
+		return new BigInteger(text.getBytes());
 	}
 	
 	public static void main(String[]args) {
 		RSAEncrypt rsaEncrypt = new RSAEncrypt();
-		rsaEncrypt.init();
+		String filePath = "dummytext.txt";
+		rsaEncrypt.testing(filePath);
 		
 	}
 }
